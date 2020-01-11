@@ -6,7 +6,8 @@
 #include "fname.h"
 #include "png.h"
 
-#if 1 // def PNG_SUPPORT
+#undef PNG_SUPPORT
+#if defined(PNG_SUPPORT)
 #pragma comment(lib, "libpng16.lib")
 
 void user_error_fn(png_structp png_ptr, png_const_charp error_msg)

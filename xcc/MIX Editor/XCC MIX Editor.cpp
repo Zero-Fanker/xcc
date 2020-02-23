@@ -4,6 +4,7 @@
 #include "id_log.h"
 #include "mix_cache.h"
 #include "xcc_dirs.h"
+#include "XCC MIX Editor CMDManager.h"
 
 BEGIN_MESSAGE_MAP(CXCCMIXEditorApp, CWinApp)
 	//{{AFX_MSG_MAP(CXCCMIXEditorApp)
@@ -27,5 +28,11 @@ BOOL CXCCMIXEditorApp::InitInstance()
 	mix_cache::load();
 	dlg.DoModal();
 	mix_cache::save();
+
 	return false;
+}
+
+void CXCCMIXEditorDlg::CreateCMDManager()
+{
+	this->CMDManager = std::make_unique<XCCMIXEditorCMDManager>();
 }

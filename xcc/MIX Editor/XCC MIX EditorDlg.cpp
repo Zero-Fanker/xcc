@@ -97,6 +97,9 @@ BOOL CXCCMIXEditorDlg::OnInitDialog()
 		read_key(xcc_dirs::get_main_mix(game_ra2));
 	m_list.auto_size();
 	update_buttons();
+	//command line handling
+	this->CreateCMDManager();
+	this->CMDManager->DoAction(this);
 	return true;
 }
 
@@ -136,17 +139,22 @@ HCURSOR CXCCMIXEditorDlg::OnQueryDragIcon()
 
 const char* mix_filter = "MIX files (*.mix)|*.mix|";
 
+void CXCCMIXEditorDlg::create_file(string& fileName)
+{
+	m_game = game_ts;
+	m_encrypted = false;
+	m_checksum = false;
+	m_fname = fileName;
+	m_open = true;
+	set_changed(false);
+}
+
 void CXCCMIXEditorDlg::OnButtonNew()
 {
 	CFileDialog dlg(false, "mix", 0, OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST, mix_filter, this);
 	if (IDOK == dlg.DoModal())
 	{
-		m_game = game_ts;
-		m_encrypted = false;
-		m_checksum = false;
-		m_fname = dlg.GetPathName();
-		m_open = true;
-		set_changed(false);
+		this->create_file(static_cast<string>(dlg.GetPathName()));
 	}
 }
 

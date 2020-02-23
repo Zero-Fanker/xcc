@@ -151,6 +151,7 @@
       <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="XCC MIX Editor CMDManager.cpp" />
     <ClCompile Include="XCC MIX Editor.cpp">
     </ClCompile>
     <ClCompile Include="XCC MIX EditorDlg.cpp">
@@ -166,6 +167,7 @@
     <ClInclude Include="MIXOptions.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="StdAfx.h" />
+    <ClInclude Include="XCC MIX Editor CMDManager.h" />
     <ClInclude Include="XCC MIX Editor.h" />
     <ClInclude Include="XCC MIX EditorDlg.h" />
     <ClInclude Include="..\misc\xcc_file.h" />

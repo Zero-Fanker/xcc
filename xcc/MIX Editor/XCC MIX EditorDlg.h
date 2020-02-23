@@ -6,6 +6,7 @@
 #include "cc_file.h"
 #include "mix_file.h"
 #include "resource.h"
+#include "XCC MIX Editor CMDManager.h"
 
 using namespace std;
 
@@ -14,6 +15,7 @@ class CXCCMIXEditorDlg : public ETSLayoutDialog
 public:
 	void add_entry(int id);
 	void add_file(const string& name);
+	void create_file(string& fileName);
 	int compact_mix();
 	int compare(int id_a, int id_b) const;
 	int get_header_size() const;
@@ -27,6 +29,8 @@ public:
 	void update_buttons();
 	void update_list();
 	CXCCMIXEditorDlg(CWnd* pParent = NULL);	// standard constructor
+	//extra features 
+	void CreateCMDManager();
 
 	//{{AFX_DATA(CXCCMIXEditorDlg)
 	enum { IDD = IDD_XCCMIXEDITOR_DIALOG };
@@ -91,4 +95,6 @@ private:
 	bool	m_open;
 	int		m_sort_column;
 	bool	m_sort_reverse;
+	//extra features 
+	std::unique_ptr<XCCMIXEditorCMDManager> CMDManager;
 };

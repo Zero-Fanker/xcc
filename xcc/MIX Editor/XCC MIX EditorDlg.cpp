@@ -59,6 +59,8 @@ BEGIN_MESSAGE_MAP(CXCCMIXEditorDlg, ETSLayoutDialog)
 	ON_NOTIFY(LVN_DELETEITEM, IDC_LIST, OnDeleteitemList)
 	ON_NOTIFY(LVN_COLUMNCLICK, IDC_LIST, OnColumnclickList)
 	ON_BN_CLICKED(IDC_BUTTON_INSERT, OnButtonInsert)
+	ON_MESSAGE(WM_CMD_HANDLE, OnCommandHandle)
+	ON_WM_TIMER()
 	ON_WM_DROPFILES()
 	//}}AFX_MSG_MAP
 END_MESSAGE_MAP()
@@ -97,9 +99,9 @@ BOOL CXCCMIXEditorDlg::OnInitDialog()
 		read_key(xcc_dirs::get_main_mix(game_ra2));
 	m_list.auto_size();
 	update_buttons();
-	//command line handling
-	this->CreateCMDManager();
-	this->CMDManager->DoAction(this);
+
+	PostMessage(WM_CMD_HANDLE);
+	//SetTimer(1, 1000, NULL);
 	return true;
 }
 
@@ -274,6 +276,10 @@ void CXCCMIXEditorDlg::add_file(const string& name)
 	m_index[id] = e;
 	set_changed(true);
 	add_entry(id);
+
+	char buffer[256];
+	sprintf_s(buffer, __FUNCTION__" id : %d", id);
+	::MessageBoxA(NULL, buffer, __FILE__, MB_OK);
 }
 
 void CXCCMIXEditorDlg::add_entry(int id)
@@ -678,4 +684,39 @@ void CXCCMIXEditorDlg::OnDropFiles(HDROP hDropInfo)
 		add_file(fname);
 	}
 	DragFinish(hDropInfo);
+}
+
+LRESULT CXCCMIXEditorDlg::OnCommandHandle(WPARAM wParam, LPARAM lParam)
+{
+	//command line handling
+	auto& manager = XCCMIXEditorCMDManager::Instance;
+	if (!manager.IsHandled()) {
+		manager.SetAsHandled(true);
+		manager.ParseArgs();
+		manager.DoAction(this);
+	}
+
+	return S_OK;
+}
+
+void CXCCMIXEditorDlg::OnTimer(UINT_PTR nIDEvent)
+{
+	switch (nIDEvent)
+	{
+		case 1://90ms
+		{
+			//auto& manager = XCCMIXEditorCMDManager::Instance;
+			//if (!manager.IsHandled()) {
+			//	manager.SetAsHandled(true);
+			//	manager.ParseArgs();
+			//	manager.DoAction(this);
+			//}
+			break;
+		}
+		default:
+			break;
+	}
+
+	CDialog::OnTimer(nIDEvent);
+
 }

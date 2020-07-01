@@ -31,8 +31,3 @@ BOOL CXCCMIXEditorApp::InitInstance()
 
 	return false;
 }
-
-void CXCCMIXEditorDlg::CreateCMDManager()
-{
-	this->CMDManager = std::make_unique<XCCMIXEditorCMDManager>();
-}

@@ -72,6 +72,8 @@ protected:
 	afx_msg void OnColumnclickList(NMHDR* pNMHDR, LRESULT* pResult) ;
 	afx_msg void OnButtonInsert();
 	afx_msg void OnDropFiles(HDROP hDropInfo);
+	afx_msg LRESULT OnCommandHandle(WPARAM wParam, LPARAM lParam);
+	afx_msg void OnTimer(UINT_PTR nIDEvent);
 	//}}AFX_MSG
 	DECLARE_MESSAGE_MAP()
 private:
@@ -95,6 +97,4 @@ private:
 	bool	m_open;
 	int		m_sort_column;
 	bool	m_sort_reverse;
-	//extra features 
-	std::unique_ptr<XCCMIXEditorCMDManager> CMDManager;
 };

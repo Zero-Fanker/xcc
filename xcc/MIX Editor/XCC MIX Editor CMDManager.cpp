@@ -10,6 +10,8 @@
 
 //namespace fs = boost::filesystem;
 
+XCCMIXEditorCMDManager XCCMIXEditorCMDManager::Instance;
+
 const char* getNextArg(int& idx)
 {
 	if (idx >= __argc) {
@@ -52,9 +54,13 @@ void XCCMIXEditorCMDManager::ParseArg(const char * arg, int& idx)
 		{
 			this->ActionType.Compact = true;
 		}
-		else if (!_strcmpi(arg, "packup"))
+		else if (!_strcmpi(action, "packup"))
 		{
 			this->ActionType.Packup = true;
+		}
+		else if (!_strcmpi(action, "extract"))
+		{
+			this->ActionType.Extract = true;
 		}
 	}
 
@@ -132,11 +138,11 @@ void XCCMIXEditorCMDManager::DoAction(CXCCMIXEditorDlg* pDlg)
 		pDlg->create_file(this->ExportFile);
 	}
 
-
 	if (this->ActionType.Extract) {
-
+		::MessageBoxA(NULL, __FUNCTION__" processing extract ", __FILE__, MB_OK);
 	}
 	else {
+
 		if (this->ActionType.Packup)
 		{
 			for (auto const& fileName : this->ImportFileNames) {
@@ -153,8 +159,9 @@ void XCCMIXEditorCMDManager::DoAction(CXCCMIXEditorDlg* pDlg)
 
 		if (this->ActionType.Compact) {
 			pDlg->compact_mix();
-			pDlg->save_mix();
 		}
+
+		pDlg->save_mix();
 	}
 
 }

@@ -26,6 +26,8 @@
 #define IDC_GAME                        1014
 #define IDC_COMBO_GAME                  1015
 
+#define WM_CMD_HANDLE	               WM_APP + 0
+
 // Next default values for new objects
 // 
 #ifdef APSTUDIO_INVOKED

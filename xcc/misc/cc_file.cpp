@@ -287,7 +287,7 @@ Ccc_file::Ccc_file(bool read_on_open):
 	t_file_type Ccc_file::get_file_type(bool fast)
 	{
 		Cvirtual_binary data;
-		int size;
+		size_t size;
 		if (m_data.data())
 		{
 			data = m_data;
@@ -295,7 +295,7 @@ Ccc_file::Ccc_file(bool read_on_open):
 		}
 		else
 		{
-			size = min<int>(m_size, 64 << 10);
+			size = min<size_t>(m_size, 64 << 10);
 			seek(0);
 			if (read(data.write_start(size), size))
 				return ft_unknown;

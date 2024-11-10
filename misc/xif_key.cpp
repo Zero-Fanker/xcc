@@ -6,7 +6,7 @@
 #include <zlib.h>
 
 #pragma comment(lib, "libbz2.lib")
-#pragma comment(lib, "zlib.lib")
+#pragma comment(lib, "zlibstatic.lib")
 
 template <class T>
 static T read(const byte*& r)

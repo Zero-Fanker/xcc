@@ -49,8 +49,12 @@
     <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">.\Release\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <IncludePath>..\..\include;..\..\..\Reference\xbt\misc\;C:\local\boost_1_71_0;$(IncludePath)</IncludePath>
+    <IncludePath>..\..\include;..\..\include\zlib;..\..\..\Reference\xbt\misc\;$(SolutionDir)..\..\..\Reference\boost_1_86_0\include;$(IncludePath)</IncludePath>
     <LibraryPath>..\..\lib;$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <IncludePath>..\..\include;..\..\include\zlib;..\..\..\Reference\xbt\misc\;$(SolutionDir)..\..\..\Reference\boost_1_86_0\include;$(VC_IncludePath);$(WindowsSdk_71A_IncludePath)</IncludePath>
+    <LibraryPath>..\..\lib;$(VC_LibraryPath_x86);$(WindowsSdk_71A_LibraryPath_x86);</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>

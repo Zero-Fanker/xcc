@@ -62,6 +62,18 @@ void XCCMIXEditorCMDManager::ParseArg(const char * arg, int& idx)
 		{
 			this->ActionType.Extract = true;
 		}
+		else if (!_strcmpi(action, "quickexit")) 
+		{
+			this->ActionType.ExitWhenFinish = true;
+		}
+		else if (!_strcmpi(action, "noxccid"))
+		{
+			this->ActionType.NoXCCID = true;
+		}
+	}
+	else if (!_strcmpi(arg, "-debug"))
+	{
+		this->DebugMode = true;
 	}
 
 }
@@ -152,16 +164,23 @@ void XCCMIXEditorCMDManager::DoAction(CXCCMIXEditorDlg* pDlg)
 
 		if (this->ActionType.Encrypt)
 		{
-			CMIXOptions dlg;
-			dlg.set(game_ra2_yr, TRUE, FALSE);
+			pDlg->set_game_option(game_ra2_yr, true);
 			//pDlg->set_changed(true);
+		}
+
+		if (this->ActionType.NoXCCID) {
+			pDlg->set_xcc_id_enable(false);
 		}
 
 		if (this->ActionType.Compact) {
 			pDlg->compact_mix();
+		} else {
+			pDlg->save_mix();
 		}
 
-		pDlg->save_mix();
+		if (this->ActionType.ExitWhenFinish) {
+			exit(0);
+		}
 	}
 
 }

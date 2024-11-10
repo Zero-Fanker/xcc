@@ -28,6 +28,8 @@ public:
 	void sort_list(int i, bool reverse);
 	void update_buttons();
 	void update_list();
+	void set_game_option(t_game game, bool encrypted);
+	void set_xcc_id_enable(bool enable);
 	CXCCMIXEditorDlg(CWnd* pParent = NULL);	// standard constructor
 	//extra features 
 	void CreateCMDManager();
@@ -97,4 +99,5 @@ private:
 	bool	m_open;
 	int		m_sort_column;
 	bool	m_sort_reverse;
+	bool m_xcc_id_enable;
 };

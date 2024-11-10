@@ -15,6 +15,8 @@ public:
 		bool Packup{ false };
 		bool Encrypt{ false };
 		bool Compact{ false };
+		bool ExitWhenFinish{ false };
+		bool NoXCCID{ false };
 	};
 
 	enum Strategy : unsigned
@@ -35,9 +37,12 @@ public:
 
 	void ParseArgs() 
 	{
-		//MessageBoxA(NULL, __FUNCTION__, __FILE__, MB_OK);
 		for (int idx = 0; idx < __argc; idx++) {
 			this->ParseArg(__argv[idx], idx);
+		}
+
+		if (this->DebugMode) {
+			MessageBoxA(NULL, __FUNCTION__, "Debug break, attach me now", MB_OK);
 		}
 
 		this->ParseFiles();
@@ -63,4 +68,5 @@ private:
 	std::string ExportFile{};
 	std::vector<std::string> ImportFileNames{};
 	bool ActionHandled{ false };
+	bool DebugMode{ false };
 };

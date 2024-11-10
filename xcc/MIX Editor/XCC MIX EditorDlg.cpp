@@ -22,6 +22,7 @@ CXCCMIXEditorDlg::CXCCMIXEditorDlg(CWnd* pParent /*=NULL*/):
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 	m_open = false;
 	m_key_loaded = false;
+	m_xcc_id_enable = true;
 }
 
 void CXCCMIXEditorDlg::DoDataExchange(CDataExchange* pDX)
@@ -216,6 +217,18 @@ void CXCCMIXEditorDlg::OnButtonOptions()
 	}
 }
 
+void CXCCMIXEditorDlg::set_game_option(t_game game, bool encrypted)
+{
+	m_game = game;
+	m_encrypted = encrypted;
+	//m_checksum = checksum;
+}
+
+void CXCCMIXEditorDlg::set_xcc_id_enable(bool enable)
+{
+	m_xcc_id_enable = enable;
+}
+
 void CXCCMIXEditorDlg::OnButtonXccHomePage()
 {
 	ShellExecute(m_hWnd, "open", "http://xccu.sourceforge.net/", NULL, NULL, SW_SHOW);
@@ -277,9 +290,9 @@ void CXCCMIXEditorDlg::add_file(const string& name)
 	set_changed(true);
 	add_entry(id);
 
-	char buffer[256];
-	sprintf_s(buffer, __FUNCTION__" id : %d", id);
-	::MessageBoxA(NULL, buffer, __FILE__, MB_OK);
+	//char buffer[256];
+	//sprintf_s(buffer, __FUNCTION__" id : %d", id);
+	//::MessageBoxA(NULL, buffer, __FILE__, MB_OK);
 }
 
 void CXCCMIXEditorDlg::add_entry(int id)
@@ -401,14 +414,19 @@ int CXCCMIXEditorDlg::save_mix()
 			if (!i.second.fname.empty())
 				g.add_fname(static_cast<Cfname>(i.second.fname).get_fname());
 		}
+
 		Cvirtual_binary lmd_data = g.write(m_game);
 		const int lmd_id = Cmix_file::get_id(m_game, "local mix database.dat");
-		t_index_entry e;
-		e.fname = "local mix database.dat";
-		e.ft = ft_xcc_lmd;
-		e.offset = 0;
-		e.size = lmd_data.size();
-		m_index[lmd_id] = e;
+
+		if (m_xcc_id_enable) {
+			t_index_entry e;
+			e.fname = "local mix database.dat";
+			e.ft = ft_xcc_lmd;
+			e.offset = 0;
+			e.size = lmd_data.size();
+			m_index[lmd_id] = e;
+		}
+
 		const int body_start = get_header_size();
 		int max_offset = body_start;
 		while (!error)
@@ -530,6 +548,7 @@ int CXCCMIXEditorDlg::compact_mix()
 			error = 1;
 		else
 		{
+			bool should_save = false;
 			bool changed;
 			do
 			{
@@ -564,11 +583,18 @@ int CXCCMIXEditorDlg::compact_mix()
 					}
 					min_offset += j.size;
 				}
+				//if any block have ever changed
+				should_save |= changed;
 			}
 			while (changed && !error);
 			f.close();
-			if (!error)
-				error = save_mix();
+			if (!error) {
+				if (should_save) {
+					error = save_mix();
+				} else {
+					this->MessageBoxA("nothing to compact", "Compact Error", MB_OK);
+				}
+			}
 		}
 	}
 	return error;

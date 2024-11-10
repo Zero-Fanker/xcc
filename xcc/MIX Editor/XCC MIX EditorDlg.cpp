@@ -566,6 +566,7 @@ int CXCCMIXEditorDlg::compact_mix()
 						min_offset = (min_offset - body_start + 0xf & ~0xf) + body_start;
 					if (j.offset > min_offset)
 					{
+						// this block copy handles the same file
 						error = copy_block(f, j.offset, f, min_offset, j.size);
 						if (error)
 							break;
@@ -588,12 +589,8 @@ int CXCCMIXEditorDlg::compact_mix()
 			}
 			while (changed && !error);
 			f.close();
-			if (!error) {
-				if (should_save) {
-					error = save_mix();
-				} else {
-					this->MessageBoxA("nothing to compact", "Compact Error", MB_OK);
-				}
+			if (!error && !should_save) {
+				this->MessageBoxA("nothing to compact", "Compact Error", MB_OK);
 			}
 		}
 	}

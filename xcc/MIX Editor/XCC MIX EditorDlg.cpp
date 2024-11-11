@@ -344,7 +344,7 @@ int CXCCMIXEditorDlg::read_mix(const string& name)
 	return 0;
 }
 
-static int copy_block(Cfile32& s, int s_p, Cfile32& d, int d_p, int size)
+static int copy_block(Cfile32& src, int src_pos, Cfile32& dst, int dst_pos, int size)
 {
 	int error = 0;
 	int buffer_size = 4 << 20;
@@ -352,18 +352,18 @@ static int copy_block(Cfile32& s, int s_p, Cfile32& d, int d_p, int size)
 	while (!error && size)
 	{
 		int cb_buffer = min(buffer_size, size);
-		s.seek(s_p);
-		if (s.read(buffer, cb_buffer))
+		src.seek(src_pos);
+		if (src.read(buffer, cb_buffer))
 			error = 1;
 		else
 		{
-			d.seek(d_p);
-			if (d.write(buffer, cb_buffer))
+			dst.seek(dst_pos);
+			if (dst.write(buffer, cb_buffer))
 				error = 1;
 			else
 			{
-				s_p += cb_buffer;
-				d_p += cb_buffer;
+				src_pos += cb_buffer;
+				dst_pos += cb_buffer;
 				size -= cb_buffer;
 			}
 		}
@@ -397,132 +397,148 @@ int CXCCMIXEditorDlg::get_max_offset() const
 	return r;
 }
 
+// this function always save newly inserted file to the end of file, but not clean up old same file name content
 int CXCCMIXEditorDlg::save_mix()
 {
-	int error = 0;
+	// TODO: save to a temp file
+
 	Cfile32 mixFile;
-	if (mixFile.open(xcc_dirs::find_file(m_fname), GENERIC_READ | GENERIC_WRITE, OPEN_ALWAYS, 0)) {
-		error = 1;
-	} else {
-		m_checksum = false;
-		if (m_game == game_td) {
-			m_encrypted = false;
-		}
-		Cxcc_lmd_file_write g;
-		for (auto& i : m_index) {
-			if (!i.second.fname.empty()) {
-				g.add_fname(static_cast<Cfname>(i.second.fname).get_fname());
-			}
-		}
-
-		Cvirtual_binary lmd_data = g.write(m_game);
-		const unsigned lmd_id = Cmix_file::get_id(m_game, "local mix database.dat");
-
-		if (m_xcc_id_enable) {
-			t_index_entry e;
-			e.fname = "local mix database.dat";
-			e.ft = ft_xcc_lmd;
-			e.offset = 0;
-			e.size = lmd_data.size();
-			m_index[lmd_id] = e;
-		}
-
-		const unsigned body_start = get_header_size();
-		unsigned max_offset = body_start;
-		while (!error)
-		{
-			unsigned id;
-			unsigned min_offset = INT_MAX;
-			for (auto& i : m_index) {
-				if (!i.second.offset) {
-					continue;
-				}
-				if (i.second.offset < min_offset) {
-					id = i.first;
-					min_offset = i.second.offset;
-				}
-				if (i.second.offset + i.second.size > max_offset) {
-					max_offset = i.second.offset + i.second.size;
-				}
-			}
-			if (body_start > min_offset) {
-				auto& j = find_ref(m_index, id);
-				error = copy_block(mixFile, min_offset, mixFile, max_offset, j.size);
-				if (!error) {
-					j.offset = max_offset;
-				}
-			} else {
-				break;
-			}
-		}
-		if (!error) {
-			for (auto& i : m_index) {
-				if (i.second.offset) {
-					continue;
-				}
-				if (i.first == lmd_id) {
-					max_offset = (max_offset - body_start + 0xf & ~0xf) + body_start;
-					mixFile.seek(max_offset);
-					mixFile.write(lmd_data.data(), lmd_data.size());
-					i.second.offset = max_offset;
-					max_offset += lmd_data.size();
-				} else {
-					Cfile32 g;
-					if (g.open(i.second.fname, GENERIC_READ)) {
-						error = 1;
-						break;
-					}
-					error = copy_block(g, 0, mixFile, max_offset, g.size());
-					if (!error) {
-						i.second.offset = max_offset;
-						max_offset += g.size();
-					}
-					g.close();
-				}
-			}
-			if (!error) {
-				mixFile.seek(max_offset);
-				if (mixFile.set_eof()) {
-					error = 1;
-				}
-			}
-		}
-		byte* data = new byte[body_start];
-		t_mix_header* header;
-		if (m_game == game_td) {
-			header = reinterpret_cast<t_mix_header*>(data);
-		} else {
-			*reinterpret_cast<int*>(data) = (m_checksum ? mix_checksum : 0) | (m_encrypted ? mix_encrypted : 0);
-			if (m_encrypted) {
-				memcpy(data + 4, m_key, cb_mix_key_source);
-				header = reinterpret_cast<t_mix_header*>(data + 4 + cb_mix_key_source);
-			} else {
-				header = reinterpret_cast<t_mix_header*>(data + 4);
-			}
-		}
-		header->c_files = m_index.size();
-		header->size = max_offset - body_start;
-		t_mix_index_entry* index = reinterpret_cast<t_mix_index_entry*>(reinterpret_cast<byte*>(header) + sizeof(t_mix_header));
-		for (auto& i : m_index) {
-			index->id = i.first;
-			index->offset = i.second.offset - body_start;
-			index->size = i.second.size;
-			index++;
-		}
-		if (m_encrypted) {
-			Cblowfish bf;
-			std::array<byte, cb_mix_key> key;
-			get_blowfish_key(m_key, key);
-			bf.set_key(key);
-			bf.encipher(header, header, body_start - (4 + cb_mix_key_source));
-		}
-		mixFile.seek(0);
-		if (mixFile.write(data, body_start) && !error) {
-			error = 1;
-		}
-		delete[] data;
-		mixFile.close();
+	if (!mixFile.open(xcc_dirs::find_file(m_fname), GENERIC_READ | GENERIC_WRITE, OPEN_ALWAYS, 0)) {
+		return 1;
+	} 
+	int error = 0;
+	m_checksum = false;
+	if (m_game == game_td) {
+		m_encrypted = false;
 	}
+	Cxcc_lmd_file_write db_file_writer;
+	for (auto& i : m_index) {
+		if (!i.second.fname.empty()) {
+			db_file_writer.add_fname(static_cast<Cfname>(i.second.fname).get_fname());
+		}
+	}
+
+	Cvirtual_binary lmd_data = db_file_writer.write(m_game);
+	const unsigned lmd_id = Cmix_file::get_id(m_game, "local mix database.dat");
+
+	if (m_xcc_id_enable) {
+		auto const result = m_index.insert_or_assign(lmd_id, t_index_entry{
+			ft_xcc_lmd,
+			0,
+			lmd_data.size(),
+			"local mix database.dat",
+		});
+	}
+
+	const unsigned header_size = get_header_size();
+	unsigned max_offset = header_size;
+	// try to copy the first file block to last
+	for (;;) {
+		unsigned id;
+		unsigned min_offset = INT_MAX;
+		for (auto& idx : m_index) {
+			// this one is not in mix file yet
+			if (!idx.second.offset) {
+				continue;
+			}
+			// get the minimum
+			if (min_offset > idx.second.offset) {
+				id = idx.first;
+				min_offset = idx.second.offset;
+			}
+			// get the maximum offset
+			if (max_offset < idx.second.offset + idx.second.size) {
+				max_offset = idx.second.offset + idx.second.size;
+			}
+		}
+		// means not found one
+		if (min_offset >= header_size) {
+			break;
+		}
+		// now it is the first item
+		auto& first_item = find_ref(m_index, id);
+		// copy the first one to last
+		error = copy_block(mixFile, min_offset, mixFile, max_offset, first_item.size);
+		if (error) {
+			return error;
+		}
+		first_item.offset = max_offset;
+	}
+	// insert new files
+	for (auto& indexed_block : m_index) {
+		// already exists in mix file
+		if (indexed_block.second.offset) {
+			continue;
+		}
+		if (indexed_block.first == lmd_id) {
+			// let's handle database file lastly
+			continue;
+		}
+		Cfile32 indexed_src_file;
+		if (indexed_src_file.open(indexed_block.second.fname, GENERIC_READ)) {
+			return 1;
+		}
+		error = copy_block(indexed_src_file, 0, mixFile, max_offset, indexed_src_file.size());
+		if (error) {
+			return error;
+		}
+		indexed_block.second.offset = max_offset;
+		max_offset += indexed_src_file.size();
+		indexed_src_file.close();
+	}
+
+	// write database file
+	auto& db_file = find_ref(m_index, lmd_id);
+	// end of the file, but align with 0xf (16 in decimal)
+	max_offset = (max_offset - header_size + 0xf & ~0xf) + header_size;
+	mixFile.seek(max_offset);
+	mixFile.write(lmd_data.data(), lmd_data.size());
+	db_file.offset = max_offset;
+	max_offset += lmd_data.size();
+
+	// go to the end
+	mixFile.seek(max_offset);
+	if (mixFile.set_eof() != 0) {
+		return 1;
+	}
+
+	byte* header_data = new byte[header_size];
+	t_mix_header* header;
+	if (m_game == game_td) {
+		header = reinterpret_cast<t_mix_header*>(header_data);
+	}
+	else {
+		*reinterpret_cast<int*>(header_data) = (m_checksum ? mix_checksum : 0) | (m_encrypted ? mix_encrypted : 0);
+		if (m_encrypted) {
+			memcpy(header_data + 4, m_key, cb_mix_key_source);
+			header = reinterpret_cast<t_mix_header*>(header_data + 4 + cb_mix_key_source);
+		}
+		else {
+			header = reinterpret_cast<t_mix_header*>(header_data + 4);
+		}
+	}
+	header->c_files = m_index.size();
+	header->size = max_offset - header_size;
+	t_mix_index_entry* index = reinterpret_cast<t_mix_index_entry*>(reinterpret_cast<byte*>(header) + sizeof(t_mix_header));
+	for (auto const& indexed_block : m_index) {
+		index->id = indexed_block.first;
+		index->offset = indexed_block.second.offset - header_size;
+		index->size = indexed_block.second.size;
+		index++;
+	}
+	if (m_encrypted) {
+		Cblowfish bf;
+		std::array<byte, cb_mix_key> key;
+		get_blowfish_key(m_key, key);
+		bf.set_key(key);
+		bf.encipher(header, header, header_size - (4 + cb_mix_key_source));
+	}
+	mixFile.seek(0);
+	if (mixFile.write(header_data, header_size) && !error) {
+		error = 1;
+	}
+	delete[] header_data;
+	mixFile.close();
 	set_changed(false);
 	update_list();
 	return error;
@@ -544,39 +560,40 @@ int CXCCMIXEditorDlg::compact_mix()
 
 	for (;;) {
 		bool changed = false;
-		map<unsigned, unsigned> ofs_list;
+		// use file offsets as key, and hash id (file name representative) as value
+		map<unsigned, unsigned> offset_ordered_crc_table;
 
 		const unsigned max_offset = get_max_offset();
 
-		for (auto& j : m_index) {
-			ofs_list[j.second.offset] = j.first;
+		for (auto& idx : m_index) {
+			offset_ordered_crc_table[idx.second.offset] = idx.first;
 		}
-		const unsigned body_start = get_header_size();
-		unsigned min_offset = body_start;
+		const unsigned payload_offset = get_header_size();
+		unsigned cur_offset = payload_offset;
 
-		for (auto& i : ofs_list) {
-			auto& j = find_ref(m_index, i.second);
+		for (auto& offset_record : offset_ordered_crc_table) {
+			auto& ordered_item = find_ref(m_index, offset_record.second);
 			if (m_game == game_ts) {
-				min_offset = (min_offset - body_start + 0xf & ~0xf) + body_start;
+				cur_offset = (cur_offset - payload_offset + 0xf & ~0xf) + payload_offset;
 			}
-			if (j.offset > min_offset) {
+			if (ordered_item.offset > cur_offset) {
 				// this block copy handles the same file
-				error = copy_block(f, j.offset, f, min_offset, j.size);
+				error = copy_block(f, ordered_item.offset, f, cur_offset, ordered_item.size);
 				if (error) {
-					break;
+					return error;
 				}
-				j.offset = min_offset;
+				ordered_item.offset = cur_offset;
 				changed = true;
-			} else if (j.offset < min_offset) {
-				error = copy_block(f, j.offset, f, max_offset, j.size);
+			} else if (ordered_item.offset < cur_offset) {
+				error = copy_block(f, ordered_item.offset, f, max_offset, ordered_item.size);
 				if (error) {
 					break;
 				}
-				j.offset = max_offset;
+				ordered_item.offset = max_offset;
 				changed = true;
 				continue;
 			}
-			min_offset += j.size;
+			cur_offset += ordered_item.size;
 		}
 		//if any block have ever changed
 		should_save |= changed;

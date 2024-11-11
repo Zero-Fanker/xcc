@@ -191,8 +191,8 @@ struct t_mix_index_entry
 	}
 
     unsigned __int32 id;
-    __int32 offset;
-    __int32 size;
+    unsigned __int32 offset;
+    unsigned __int32 size;
 };
 
 struct t_mix_rg_header

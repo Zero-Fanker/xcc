@@ -107,7 +107,7 @@ void mix_database::add_name(t_game game, const string& name, const string& descr
 	get_list(game)[Cmix_file::get_id(game, name)] = idinfo;
 }
 
-string mix_database::get_name(t_game game, int id)
+string mix_database::get_name(t_game game, unsigned id)
 {
 	auto i = find_ptr(get_list(game), id);
 	return i ? i->name : "";

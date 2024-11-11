@@ -82,8 +82,8 @@ private:
 	struct t_index_entry
 	{
 		t_file_type ft;
-		int offset;
-		int size;
+		unsigned offset;
+		unsigned size;
 		string fname;
 	};
 
@@ -93,7 +93,7 @@ private:
 	bool	m_encrypted;
 	string	m_fname;
 	t_game	m_game;
-	map<int, t_index_entry>	m_index;	
+	map<unsigned, t_index_entry>	m_index;	
 	byte	m_key[cb_mix_key_source];
 	bool	m_key_loaded;
 	bool	m_open;

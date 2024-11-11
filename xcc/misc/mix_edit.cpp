@@ -117,7 +117,7 @@ int Cmix_edit::write_index()
 			}
 		}
 	}
-	int total_size = d.size();
+	unsigned total_size = d.size();
 	t_mix_index_entry* index = reinterpret_cast<t_mix_index_entry*>(w);
 	for (auto& i : m_index)
 	{

@@ -8,7 +8,7 @@ class Cmix_file: public Ccc_file
 public:
 	int post_open();
 	string get_name(int id);
-	static int get_id(t_game game, string name);
+	static unsigned get_id(t_game game, string name);
 	int get_index(unsigned int id) const;
 	Ccc_file::get_size;
 	Ccc_file::vdata;
@@ -51,7 +51,7 @@ public:
 		return m_index_ft[get_index(id)];
 	}
 
-	int get_id(int index) const
+	unsigned get_id(int index) const
 	{
 		return m_index[index].id;
 	}

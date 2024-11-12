@@ -18,8 +18,9 @@ public:
 	void create_file(string& fileName);
 	int compact_mix();
 	int compare(int id_a, int id_b) const;
-	int get_header_size() const;
-	int get_max_offset() const;
+	// extra size is for xcc db file
+	int get_header_size(bool including_db_file) const;
+	int get_max_offset(bool including_db_file) const;
 	int read_key(const string& name);
 	int read_mix(const string& name);
 	int save_mix();
@@ -81,10 +82,11 @@ protected:
 private:
 	struct t_index_entry
 	{
-		t_file_type ft;
-		unsigned offset;
-		unsigned size;
-		string fname;
+		t_file_type ft{ ft_unknown };
+		unsigned offset{ 0 };
+		unsigned size{ 0 };
+		string fname{};
+		bool is_override{ false };
 	};
 
 	bool	m_changed;

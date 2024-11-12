@@ -14,6 +14,8 @@ using namespace std;
 class Cfile32
 {
 public:
+	~Cfile32() { close(); }
+
 	Cvirtual_binary get_mm();
 	int open(const Cwin_handle& h);
 	int open(const string& name, int access);

@@ -12,6 +12,8 @@
 #include "xcc_dirs.h"
 #include "xcc_lmd_file_write.h"
 
+constexpr const char* database_file_name = "local mix database.dat";
+
 CXCCMIXEditorDlg::CXCCMIXEditorDlg(CWnd* pParent /*=NULL*/):
 	ETSLayoutDialog(CXCCMIXEditorDlg::IDD, pParent, "XCCMIXEditorDlg")
 {
@@ -275,21 +277,42 @@ void CXCCMIXEditorDlg::add_file(const string& name)
 		return;
 	}
 	const string fname = static_cast<Cfname>(name).get_fname();
-	auto const id = Cmix_file::get_id(m_game, fname);
-	if (m_index.find(id) != m_index.end()) {
-		m_index.erase(id);
-	}
-	t_index_entry newEntry;
+
 	Ccc_file inputFile(false);
 	if (inputFile.open(name)) {
 		return;
 	}
-	newEntry.ft = inputFile.get_file_type();
+	auto const new_file_size = static_cast<unsigned>(inputFile.get_size());
+	auto const id = Cmix_file::get_id(m_game, fname);
+
+	{
+		auto const it = m_index.find(id);
+		// found, and can still be fit in
+		if (it != m_index.end()) {
+			if (new_file_size <= it->second.size) {
+				it->second.fname = name;
+				it->second.size = new_file_size;
+				it->second.is_override = true;
+				return;// we don't need to reconstruct
+			} else {
+				// sorry you have to get lost, see you later
+				m_index.erase(id);
+			}
+		}
+	}
+
+	auto const result = m_index.insert(
+		{ id, t_index_entry {
+				 inputFile.get_file_type(),
+					0,
+					new_file_size,
+					name,
+			}
+		});
+
+	ASSERT(result.second);
 	inputFile.close();
-	newEntry.fname = name;
-	newEntry.offset = 0;
-	newEntry.size = inputFile.get_size();
-	m_index[id] = newEntry;
+
 	set_changed(true);
 	add_entry(id);
 
@@ -384,14 +407,14 @@ static int get_header_size(t_game game, int c_files, bool checksum, bool encrypt
 		return 4 + sizeof(t_mix_header) + cb_index + cb_checksum;
 }
 
-int CXCCMIXEditorDlg::get_header_size() const
+int CXCCMIXEditorDlg::get_header_size(bool including_db_file) const
 {
-	return ::get_header_size(m_game, m_index.size(), m_checksum, m_encrypted);
+	return ::get_header_size(m_game, m_index.size() + static_cast<int>(including_db_file == true), m_checksum, m_encrypted);
 }
 
-int CXCCMIXEditorDlg::get_max_offset() const
+int CXCCMIXEditorDlg::get_max_offset(bool including_db_file) const
 {
-	unsigned r = get_header_size();
+	unsigned r = get_header_size(including_db_file);
 	for (auto& i : m_index)
 		r = max(r, i.second.offset + i.second.size);
 	return r;
@@ -403,7 +426,7 @@ int CXCCMIXEditorDlg::save_mix()
 	// TODO: save to a temp file
 
 	Cfile32 mixFile;
-	if (!mixFile.open(xcc_dirs::find_file(m_fname), GENERIC_READ | GENERIC_WRITE, OPEN_ALWAYS, 0)) {
+	if (mixFile.open(xcc_dirs::find_file(m_fname), GENERIC_READ | GENERIC_WRITE, OPEN_ALWAYS, 0)) {
 		return 1;
 	} 
 	int error = 0;
@@ -411,26 +434,12 @@ int CXCCMIXEditorDlg::save_mix()
 	if (m_game == game_td) {
 		m_encrypted = false;
 	}
-	Cxcc_lmd_file_write db_file_writer;
-	for (auto& i : m_index) {
-		if (!i.second.fname.empty()) {
-			db_file_writer.add_fname(static_cast<Cfname>(i.second.fname).get_fname());
-		}
-	}
 
-	Cvirtual_binary lmd_data = db_file_writer.write(m_game);
-	const unsigned lmd_id = Cmix_file::get_id(m_game, "local mix database.dat");
+	const unsigned lmd_id = Cmix_file::get_id(m_game, database_file_name);
+	// always remove it first
+	m_index.erase(lmd_id);
 
-	if (m_xcc_id_enable) {
-		auto const result = m_index.insert_or_assign(lmd_id, t_index_entry{
-			ft_xcc_lmd,
-			0,
-			lmd_data.size(),
-			"local mix database.dat",
-		});
-	}
-
-	const unsigned header_size = get_header_size();
+	const unsigned header_size = get_header_size(m_xcc_id_enable);
 	unsigned max_offset = header_size;
 	// try to copy the first file block to last
 	for (;;) {
@@ -466,8 +475,9 @@ int CXCCMIXEditorDlg::save_mix()
 	}
 	// insert new files
 	for (auto& indexed_block : m_index) {
+		auto& block_entry = indexed_block.second;
 		// already exists in mix file
-		if (indexed_block.second.offset) {
+		if (block_entry.offset && !block_entry.is_override) {
 			continue;
 		}
 		if (indexed_block.first == lmd_id) {
@@ -475,26 +485,52 @@ int CXCCMIXEditorDlg::save_mix()
 			continue;
 		}
 		Cfile32 indexed_src_file;
-		if (indexed_src_file.open(indexed_block.second.fname, GENERIC_READ)) {
+		if (indexed_src_file.open(block_entry.fname, GENERIC_READ)) {
 			return 1;
+		}
+		if (block_entry.is_override) {
+			ASSERT(indexed_src_file.size() <= block_entry.size);
+			error = copy_block(indexed_src_file, 0, mixFile, block_entry.offset, indexed_src_file.size());
+			if (error) {
+				return error;
+			}
+			// we only do it one time;
+			block_entry.is_override = false;
+			continue;
 		}
 		error = copy_block(indexed_src_file, 0, mixFile, max_offset, indexed_src_file.size());
 		if (error) {
 			return error;
 		}
-		indexed_block.second.offset = max_offset;
+		block_entry.offset = max_offset;
 		max_offset += indexed_src_file.size();
 		indexed_src_file.close();
 	}
 
 	// write database file
-	auto& db_file = find_ref(m_index, lmd_id);
-	// end of the file, but align with 0xf (16 in decimal)
-	max_offset = (max_offset - header_size + 0xf & ~0xf) + header_size;
-	mixFile.seek(max_offset);
-	mixFile.write(lmd_data.data(), lmd_data.size());
-	db_file.offset = max_offset;
-	max_offset += lmd_data.size();
+	if (m_xcc_id_enable) {
+		Cxcc_lmd_file_write db_file_writer;
+		for (auto& i : m_index) {
+			if (!i.second.fname.empty()) {
+				db_file_writer.add_fname(static_cast<Cfname>(i.second.fname).get_fname());
+			}
+		}
+
+		Cvirtual_binary lmd_data = db_file_writer.write(m_game);
+		auto const result = m_index.emplace(lmd_id, t_index_entry{
+			ft_xcc_lmd,
+			0,
+			lmd_data.size(),
+			database_file_name,
+			});
+		ASSERT(result.second);
+		// end of the file, but align with 0xf (16 in decimal)
+		max_offset = (max_offset - header_size + 0xf & ~0xf) + header_size;
+		mixFile.seek(max_offset);
+		mixFile.write(lmd_data.data(), lmd_data.size());
+		result.first->second.offset = max_offset;
+		max_offset += lmd_data.size();
+	}
 
 	// go to the end
 	mixFile.seek(max_offset);
@@ -558,42 +594,113 @@ int CXCCMIXEditorDlg::compact_mix()
 
 	bool should_save = false;
 
-	for (;;) {
+	// remove database file first, since it will be reconstructed
+	auto const erase_ret = m_index.erase(Cmix_file::get_id(m_game, database_file_name));
+	ASSERT(erase_ret == 1);
+
+	// this dead loop checks indexes multiple rounds,
+	// each round it checks whether there are gaps between blocks, and try to move items to fill gaps
+	// if there is not enough gap space, the block will be copied to the end of file first (make gaps), 
+	// and then goes to next round.
+	unsigned round = 0;
+	for (;; ++round) {
 		bool changed = false;
+		unsigned debug_last_offset = 0;
 		// use file offsets as key, and hash id (file name representative) as value
 		map<unsigned, unsigned> offset_ordered_crc_table;
 
-		const unsigned max_offset = get_max_offset();
+		unsigned max_offset = get_max_offset(m_xcc_id_enable);
 
 		for (auto& idx : m_index) {
-			offset_ordered_crc_table[idx.second.offset] = idx.first;
+			auto const result = offset_ordered_crc_table.emplace(idx.second.offset, idx.first);
+			ASSERT(result.second);
 		}
-		const unsigned payload_offset = get_header_size();
+		const unsigned payload_offset = get_header_size(m_xcc_id_enable);
 		unsigned cur_offset = payload_offset;
 
-		for (auto& offset_record : offset_ordered_crc_table) {
-			auto& ordered_item = find_ref(m_index, offset_record.second);
+		for (auto it = offset_ordered_crc_table.begin();
+			it != offset_ordered_crc_table.end();
+			++it) {
+			auto& ordered_block = find_ref(m_index, it->second);
+			ASSERT(ordered_block.size > 0);
 			if (m_game == game_ts) {
 				cur_offset = (cur_offset - payload_offset + 0xf & ~0xf) + payload_offset;
 			}
-			if (ordered_item.offset > cur_offset) {
+
+			ASSERT(debug_last_offset != cur_offset);
+			debug_last_offset = cur_offset;
+
+			unsigned current_gap = 0;
+
+			bool copy_to_cur_offset = false;
+			bool copy_to_end = false;
+			// this block is not close enough to current offset
+			// so copy it here
+			if (ordered_block.offset > cur_offset) {
+				current_gap = ordered_block.offset - cur_offset;
+				// safe check, we have enough gap:
+				if (current_gap >= ordered_block.size) {
+					copy_to_cur_offset = true;
+				} else {// we don't have enough gap, other wise next block item will be overriden
+					copy_to_end = true;
+				}
+			} else if (ordered_block.offset < cur_offset) {
+				// this block is before current offset
+				// copy it to the end of file
+				copy_to_end = true;
+			} else {
+
+#if defined(DEBUG)
+				auto next_it = [&it, &offset_ordered_crc_table]() {
+					auto it_copy = it;
+					if (it != offset_ordered_crc_table.end()) {
+						++it_copy;
+					}
+					return it_copy;
+				};
+				auto const next = next_it();
+				if (next != offset_ordered_crc_table.end()) {
+					auto const& next_block = find_ref(m_index, next->second);
+					ASSERT(next_block.offset != cur_offset);
+					if (next_block.offset > cur_offset) {
+						current_gap = next_block.offset - cur_offset;
+					}
+				} else {
+					// I am the last one
+					current_gap = ordered_block.size;
+				}
+#endif
+				// if same, no need to move or copy
+				ASSERT(ordered_block.size <= current_gap);
+				cur_offset += ordered_block.size;
+				continue;
+			}
+
+			ASSERT((copy_to_cur_offset + copy_to_end) <= 1);
+			if (copy_to_cur_offset) {
 				// this block copy handles the same file
-				error = copy_block(f, ordered_item.offset, f, cur_offset, ordered_item.size);
+				error = copy_block(f, ordered_block.offset, f, cur_offset, ordered_block.size);
 				if (error) {
 					return error;
 				}
-				ordered_item.offset = cur_offset;
+				ordered_block.offset = cur_offset;
+				cur_offset += ordered_block.size;
 				changed = true;
-			} else if (ordered_item.offset < cur_offset) {
-				error = copy_block(f, ordered_item.offset, f, max_offset, ordered_item.size);
+			}
+			
+			if (copy_to_end) {
+				error = copy_block(f, ordered_block.offset, f, max_offset, ordered_block.size);
 				if (error) {
 					break;
 				}
-				ordered_item.offset = max_offset;
+				//// now my old offset is available for data override
+				//cur_offset = ordered_block.offset;
+				// mine new offset is at the end
+				ordered_block.offset = max_offset;
+				max_offset += ordered_block.size;
 				changed = true;
 				continue;
 			}
-			cur_offset += ordered_item.size;
 		}
 		//if any block have ever changed
 		should_save |= changed;
@@ -602,13 +709,16 @@ int CXCCMIXEditorDlg::compact_mix()
 		}
 	}
 	f.close();
-	if (!error) {
-		if (should_save) {
-			error = save_mix();
-		}
-		else {
-			this->MessageBoxA("nothing to compact", "Compact Error", MB_OK);
-		}
+
+	if (error) {
+		return error;
+	}
+
+	if (should_save) {
+		error = save_mix();
+	}
+	else {
+		this->MessageBoxA("nothing to compact", "Compact Error", MB_OK);
 	}
 	return error;
 }

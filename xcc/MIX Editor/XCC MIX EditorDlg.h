@@ -95,7 +95,7 @@ private:
 	bool	m_encrypted;
 	string	m_fname;
 	t_game	m_game;
-	map<unsigned, t_index_entry>	m_index;	
+	map<signed, t_index_entry>	m_index;	
 	byte	m_key[cb_mix_key_source];
 	bool	m_key_loaded;
 	bool	m_open;
